@@ -38,9 +38,10 @@ var server = http.createServer(function (req, res) {
       var authCode = query.code;
 
       if (query.error == undefined && authCode != undefined) {
-        initToken(authCode);
-        res.writeHead(301, { 'Location': global.FE_URL + '?accessCode=' + authCode });
-        res.end();
+        initToken(authCode, function () {
+          res.writeHead(301, { 'Location': global.FE_URL + '?accessCode=' + authCode });
+          res.end();
+        });
       } else {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: "failure", message: query.error }));
@@ -63,59 +64,99 @@ var server = http.createServer(function (req, res) {
 
     if (pathName == "/threads") {
       loadThreads(global.oauth2Client, function (data) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ data: data }));
+        var query = urlParam.query;
+        var authCode = query.accessCode;
+
+        initToken(authCode, function () {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials' : true });
+          res.write(JSON.stringify(data));
+          res.end();
+        });
+      });
+    }
+
+    if (pathName == "/messages") {
+      loadMessages(global.oauth2Client, function (data) {
+        var query = urlParam.query;
+        var authCode = query.accessCode;
+
+        initToken(authCode, function () {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials' : true });
+          res.write(JSON.stringify(data));
+          res.end();
+        });
       });
     }
   } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('Server has encountered an error: ' + err + ". Please try again!");
+    console.log(err);
   }
 });
 server.listen(8080);
 
 console.log("Server is now running at port 8080!");
 
-async function initToken(code) {
-  const { tokens } = await global.oauth2Client.getToken(code)
-  global.oauth2Client.setCredentials(tokens);
+async function initToken(code, callback) {
+  try {
+    //console.log("credentials: " + JSON.stringify(global.oauth2Client.credentials));
+    let credentials = JSON.stringify(global.oauth2Client.credentials);
+    if (credentials == "{}") {
+      const { tokens } = await global.oauth2Client.getToken(code)
+      global.oauth2Client.setCredentials(tokens);
+    }
+    callback();
+  } catch (err) {
+    console.log(err);
+  }
 }
 
 async function loadLabels(auth, callback) {
-  const gmail = google.gmail({ version: 'v1', auth });
-  const res = await gmail.users.labels.list({
-    userId: 'me',
-  });
-  var labels = res.data.labels;
-  console.log("Labels: " + JSON.stringify(labels));
-  callback(labels);
+  try {
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.labels.list({
+      userId: 'me',
+    });
+    var labels = res.data.labels;
+    callback(labels);
+  } catch (err) {
+    console.log(err);
+  }
 }
 
 async function loadThreads(auth, callback) {
-  const gmail = google.gmail({ version: 'v1', auth });
-  const res = await gmail.users.threads.list({
-    userId: 'me',
-  });
-  var threads = res.data.threads;
-  console.log("Threads: " + JSON.stringify(threads));
-  callback(threads);
+  try {
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.threads.list({
+      userId: 'me',
+    });
+    var threads = res.data.threads;
+    callback(threads);
+  } catch (err) {
+    console.log(err);
+  }
+
 }
 
 async function loadMessages(auth, callback) {
-  const gmail = google.gmail({ version: 'v1', auth });
-  const res = await gmail.users.messages.list({
-    userId: 'me',
-  });
-  var messages = res.data.messages;
-  //console.log("Messages: " + JSON.stringify(messages));
-  callback(messages);
+  try {
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.messages.list({
+      userId: 'me',
+    });
+    var messages = res.data.messages;
+    callback(messages);
+  } catch (err) {
+    console.log(err);
+  }
 }
 
 async function loadHistories(auth) {
-  const gmail = google.gmail({ version: 'v1', auth });
-  const res = await gmail.users.history.list({
-    userId: 'me',
-  });
-  var histories = res.data.histories;
-  console.log("Histories: " + JSON.stringify(histories));
+  try {
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.history.list({
+      userId: 'me',
+    });
+    var histories = res.data.histories;
+  } catch (err) {
+    console.log(err);
+  }
 }
